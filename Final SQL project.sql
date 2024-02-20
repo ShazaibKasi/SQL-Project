@@ -9370,7 +9370,7 @@ select * from regions;
 SELECT COUNT(DISTINCT node_id) AS unique_nodes
 FROM customer_nodes;
 
--- . What is the number of nodes per region?
+-- 2. What is the number of nodes per region?
 
 SELECT c.region_id,
 	region_name,
@@ -9393,7 +9393,7 @@ GROUP BY cn.region_id, region_name
 ORDER BY num_of_customers DESC;
 
 -- 4. How many days on average are customers reallocated to a different node?
-------------------------------------- to be reviewed later ----------------------
+
 
 SELECT AVG(DATEDIFF(end_date, start_date)) AS avg_number_of_days
 FROM customer_nodes
@@ -9402,7 +9402,6 @@ WHERE end_date != '9999-12-31';
 
 -- 5. What is the median, 80th and 95th percentile for this same reallocation days metric for each region?
 
--- to be reviewed later -------------------
 with rows_ as (
 select c.customer_id,
 r.region_name, DATEDIFF(c.end_date, c.start_date) AS days_difference,
@@ -9420,7 +9419,7 @@ from rows_
 group by region_name;
 
 -- B. Customer Transactions
--- What is the unique count and total amount for each transaction type?
+-- 1. What is the unique count and total amount for each transaction type?
 
 SELECT txn_type,
        COUNT(*) AS unique_count,
@@ -9447,7 +9446,7 @@ FROM deposit_summary
 WHERE txn_type = 'deposit'
 GROUP BY txn_type;
 
--- For each month - how many Data Bank customers make more than 1 deposit and either 1 purchase or 1 withdrawal in a single month?
+-- 3. For each month - how many Data Bank customers make more than 1 deposit and either 1 purchase or 1 withdrawal in a single month?
 
     WITH customer_activity AS
 (
@@ -9507,7 +9506,7 @@ FROM customer_transactions;
   
   
   -- Challenge Questions
-  -- 5. 1. What is the percentage of customers who increase their closing balance by more than 5%?
+  -- 1. What is the percentage of customers who increase their closing balance by more than 5%?
   
   WITH monthly_transactions AS (
     SELECT 
@@ -9590,11 +9589,58 @@ SELECT customer_id,
        MAX(running_balance) AS max_running_balance
 FROM running_balance
 GROUP BY customer_id;
+
+
+WITH adjusted_amount AS (
+    SELECT 
+        customer_id, 
+        extract(MONTH from txn_date) AS month_number,
+        monthname(txn_date) AS month,
+               SUM(CASE 
+            WHEN txn_type = 'deposit' THEN txn_amount
+            ELSE -txn_amount
+        END) AS monthly_amount
+    FROM 
+       customer_transactions
+    GROUP BY 
+        customer_id, extract(MONTH from txn_date), monthname(txn_date)
+),
+interest AS (
+    SELECT 
+        customer_id, 
+        month_number,
+        month, 
+        monthly_amount,
+        ROUND(((monthly_amount * 6.0 * 1) / (100.0 * 12)), 2) AS interest
+    FROM 
+        adjusted_amount
+),
+total_earnings AS (
+    SELECT 
+        customer_id, 
+        month_number, 
+        month,
+        (monthly_amount + interest) as earnings
+    FROM  
+        interest
+)
+SELECT 
+    month_number,
+    month,
+    SUM(CASE WHEN earnings < 0 THEN 0 ELSE earnings END) AS allocation
+FROM 
+    total_earnings
+GROUP BY 
+    month_number, month
+ORDER BY 
+    month_number, month;
+
   
 
 
 
 
+ 
 
 
 
